@@ -4,3 +4,5 @@
 /Avs.Messaging.InMemoryTransport/bin
 /Avs.Messaging.RabbitMq/obj
 /Avs.Messaging.RabbitMq/bin
+/Avs.Messaging.Tests/obj
+/Avs.Messaging.Tests/bin
