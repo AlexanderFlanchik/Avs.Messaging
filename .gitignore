@@ -1,0 +1,6 @@
+/Avs.Messaging/obj
+/Avs.Messaging/bin
+/Avs.Messaging.InMemoryTransport/obj
+/Avs.Messaging.InMemoryTransport/bin
+/Avs.Messaging.RabbitMq/obj
+/Avs.Messaging.RabbitMq/bin
