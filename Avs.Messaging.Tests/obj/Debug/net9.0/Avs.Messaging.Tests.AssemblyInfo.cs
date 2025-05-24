@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Avs.Messaging.Tests")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9d1ff8c9fe75426b3044fceae0c2fad2a0afcfb3")]
 [assembly: System.Reflection.AssemblyProductAttribute("Avs.Messaging.Tests")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Avs.Messaging.Tests")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
