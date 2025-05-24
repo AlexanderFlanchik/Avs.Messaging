@@ -1,0 +1,15 @@
+/Users/oleksandr.flanchyk/Projects/Avs.Messaging/Avs.Messaging.InMemoryTransport/bin/Debug/net9.0/Avs.Messaging.InMemoryTransport.deps.json
+/Users/oleksandr.flanchyk/Projects/Avs.Messaging/Avs.Messaging.InMemoryTransport/bin/Debug/net9.0/Avs.Messaging.InMemoryTransport.dll
+/Users/oleksandr.flanchyk/Projects/Avs.Messaging/Avs.Messaging.InMemoryTransport/bin/Debug/net9.0/Avs.Messaging.InMemoryTransport.pdb
+/Users/oleksandr.flanchyk/Projects/Avs.Messaging/Avs.Messaging.InMemoryTransport/bin/Debug/net9.0/Avs.Messaging.dll
+/Users/oleksandr.flanchyk/Projects/Avs.Messaging/Avs.Messaging.InMemoryTransport/bin/Debug/net9.0/Avs.Messaging.pdb
+/Users/oleksandr.flanchyk/Projects/Avs.Messaging/Avs.Messaging.InMemoryTransport/obj/Debug/net9.0/Avs.Messaging.InMemoryTransport.csproj.AssemblyReference.cache
+/Users/oleksandr.flanchyk/Projects/Avs.Messaging/Avs.Messaging.InMemoryTransport/obj/Debug/net9.0/Avs.Messaging.InMemoryTransport.GeneratedMSBuildEditorConfig.editorconfig
+/Users/oleksandr.flanchyk/Projects/Avs.Messaging/Avs.Messaging.InMemoryTransport/obj/Debug/net9.0/Avs.Messaging.InMemoryTransport.AssemblyInfoInputs.cache
+/Users/oleksandr.flanchyk/Projects/Avs.Messaging/Avs.Messaging.InMemoryTransport/obj/Debug/net9.0/Avs.Messaging.InMemoryTransport.AssemblyInfo.cs
+/Users/oleksandr.flanchyk/Projects/Avs.Messaging/Avs.Messaging.InMemoryTransport/obj/Debug/net9.0/Avs.Messaging.InMemoryTransport.csproj.CoreCompileInputs.cache
+/Users/oleksandr.flanchyk/Projects/Avs.Messaging/Avs.Messaging.InMemoryTransport/obj/Debug/net9.0/Avs.Mess.ADB004FF.Up2Date
+/Users/oleksandr.flanchyk/Projects/Avs.Messaging/Avs.Messaging.InMemoryTransport/obj/Debug/net9.0/Avs.Messaging.InMemoryTransport.dll
+/Users/oleksandr.flanchyk/Projects/Avs.Messaging/Avs.Messaging.InMemoryTransport/obj/Debug/net9.0/refint/Avs.Messaging.InMemoryTransport.dll
+/Users/oleksandr.flanchyk/Projects/Avs.Messaging/Avs.Messaging.InMemoryTransport/obj/Debug/net9.0/Avs.Messaging.InMemoryTransport.pdb
+/Users/oleksandr.flanchyk/Projects/Avs.Messaging/Avs.Messaging.InMemoryTransport/obj/Debug/net9.0/ref/Avs.Messaging.InMemoryTransport.dll
