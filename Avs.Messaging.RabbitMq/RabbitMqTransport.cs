@@ -24,7 +24,7 @@ internal class RabbitMqTransport(
 
     public Task PublishAsync<T>(T message, PublishOptions? publishOptions = null, CancellationToken cancellationToken = default)
     {
-       var consumerSettings = GetConsumerSettings(typeof(T));
+       var consumerSettings = GetExchangeSettings(typeof(T));
        if (!string.IsNullOrEmpty(publishOptions?.CorrelationId))
        {
            consumerSettings.Props = consumerSettings.Props ?? new BasicProperties();
@@ -166,7 +166,7 @@ internal class RabbitMqTransport(
     
     private async Task SubscribeAsync(Type messageType, IConsumer consumer, CancellationToken cancellationToken = default)
     {
-        var consumerSettings = GetConsumerSettings(messageType);
+        var consumerSettings = GetExchangeSettings(messageType);
         
         var isExchangeDurable = consumerSettings.IsExchangeDurable;
         var isQueueDurable = consumerSettings.IsQueueDurable;
@@ -293,7 +293,7 @@ internal class RabbitMqTransport(
         }
     }
     
-    private ExchangeOptions GetConsumerSettings(Type messageType)
+    private ExchangeOptions GetExchangeSettings(Type messageType)
     {
         rabbitMqOptions.ExchangeSettings.TryGetValue(messageType, out var consumerSettings);
         return consumerSettings ?? 

@@ -1,0 +1,14 @@
+@using Contracts
+
+<tr>
+    <td>@Data.UserId</td>
+    <td>@Data.FirstName</td>
+    <td>@Data.LastName</td>
+    <td>@Data.Login</td>
+    <td>@Data.Email</td>
+</tr>
+
+@code {
+    [Parameter]
+    public NewUser Data { get; set; } = default!;
+}
