@@ -6,19 +6,22 @@ using Microsoft.Extensions.Logging;
 
 namespace Avs.Messaging.InMemoryTransport;
 
-internal class InMemoryTransport :  MessageTransportBase, IMessageTransport
+internal class InMemoryTransport : IMessageTransport
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<InMemoryTransport> _logger;
-    private readonly ILookup<Type, IConsumer> _consumerLookup;
+    private readonly Dictionary<Type, List<Type>> _consumerLookup;
     private readonly ConcurrentDictionary<string, RequestReplyInfo> _requestsMap = new();
     private IMessagePublisher? _publisher;
 
-    public InMemoryTransport(IServiceProvider serviceProvider, ILogger<InMemoryTransport> logger) : base(serviceProvider)
+    public InMemoryTransport(
+        IServiceProvider serviceProvider,
+        MessagingOptions messagingOptions,
+        ILogger<InMemoryTransport> logger)
     {
         _serviceProvider = serviceProvider;
         _logger = logger;
-        _consumerLookup = GetSubscribers();
+        _consumerLookup = messagingOptions.ConsumerTypes;
     }
 
     public ValueTask DisposeAsync()
@@ -29,7 +32,7 @@ internal class InMemoryTransport :  MessageTransportBase, IMessageTransport
     public async Task PublishAsync<T>(T message, PublishOptions? publishOptions = null, CancellationToken cancellationToken = default)
     {
         var consumers = _consumerLookup.Where(k => k.Key == typeof(T))
-            .SelectMany(v => v.ToList()).ToArray();
+            .SelectMany(v => v.Value).ToArray();
         
         if (consumers.Length == 0)
         {
@@ -67,7 +70,16 @@ internal class InMemoryTransport :  MessageTransportBase, IMessageTransport
             }
         }
 
-        await Parallel.ForEachAsync(consumers, cancellationToken, async (consumer, _) => await SafeConsumeAsync(consumer, context));
+        await Parallel.ForEachAsync(consumers, cancellationToken, async (consumerType, _) =>
+        {
+            using var scope = _serviceProvider.CreateScope();
+            if (scope.ServiceProvider.GetService(consumerType) is not IConsumer consumer)
+            {
+                return;
+            }
+            
+            await SafeConsumeAsync(consumer, context);
+        });
     }
 
     public Task InitAsync(CancellationToken cancellationToken = default)
@@ -78,8 +90,7 @@ internal class InMemoryTransport :  MessageTransportBase, IMessageTransport
 
     public async Task<TResponse> RequestAsync<TRequest, TResponse>(TRequest request, CancellationToken cancellationToken = default)
     {
-        var requestConsumer = _consumerLookup.FirstOrDefault(k => k.Key == typeof(TRequest));
-        if (requestConsumer is null)
+        if (!_consumerLookup.ContainsKey(typeof(TRequest)))
         {
             throw new RequestReplyException(RequestReplyError.HandlerError, 
                     $"No request consumer registered for type {typeof(TRequest)}.");

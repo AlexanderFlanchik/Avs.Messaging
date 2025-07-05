@@ -11,16 +11,16 @@ using RabbitMQ.Client.Events;
 namespace Avs.Messaging.RabbitMq;
 
 internal class RabbitMqTransport( 
-    RabbitMqOptions rabbitMqOptions, 
+    RabbitMqOptions rabbitMqOptions,
+    MessagingOptions messagingOptions,
     IServiceProvider serviceProvider,
     ILogger<MessageListenerHost> logger) 
-    : MessageTransportBase(serviceProvider), IMessageTransport
+    : IMessageTransport
 {
     private IConnection? _connection;
     private IChannel? _channel;
     private IMessagePublisher? _publisher;
     private readonly ConcurrentDictionary<string, RequestReplyInfo> _requestReplyMap = new();
-    private readonly IServiceProvider _serviceProvider = serviceProvider;
 
     public Task PublishAsync<T>(T message, PublishOptions? publishOptions = null, CancellationToken cancellationToken = default)
     {
@@ -37,7 +37,7 @@ internal class RabbitMqTransport(
     public async Task InitAsync(CancellationToken cancellationToken = default)
     {
         var factory = new ConnectionFactory() { HostName =  rabbitMqOptions.Host, Port = rabbitMqOptions.Port };
-        _publisher = _serviceProvider.GetService<IMessagePublisher>();
+        _publisher = serviceProvider.GetService<IMessagePublisher>();
         
         if (!string.IsNullOrEmpty(rabbitMqOptions.Username))
         {
@@ -56,12 +56,11 @@ internal class RabbitMqTransport(
         }
         
         _channel = await _connection.CreateChannelAsync(cancellationToken: cancellationToken);
-        var subscribers = GetSubscribers();
         
         int consumerCount = 0;
-        foreach (var group in subscribers)
+        foreach (var group in  messagingOptions.ConsumerTypes)
         {
-            var consumers = group.ToList();
+            var consumers = group.Value;
             foreach (var consumer in consumers)
             {
                 await SubscribeAsync(group.Key, consumer, cancellationToken);
@@ -164,7 +163,7 @@ internal class RabbitMqTransport(
         }
     }
     
-    private async Task SubscribeAsync(Type messageType, IConsumer consumer, CancellationToken cancellationToken = default)
+    private async Task SubscribeAsync(Type messageType, Type consumerType, CancellationToken cancellationToken = default)
     {
         var consumerSettings = GetExchangeSettings(messageType);
         
@@ -194,9 +193,17 @@ internal class RabbitMqTransport(
         );
         
         var channelConsumer = new AsyncEventingBasicConsumer(_channel!);
-        channelConsumer.ReceivedAsync += async (_, ea) => 
+        channelConsumer.ReceivedAsync += async (_, ea) =>
+        {
+            using var scope = serviceProvider.CreateScope();
+            if (scope.ServiceProvider.GetService(consumerType) is not IConsumer consumer)
+            {
+                return;
+            }
+            
             await ReceiveMessageAsync(ea, messageType, consumer, consumerSettings!.IsRequestReply);
-        
+        };
+
         await _channel!.BasicConsumeAsync(queueName, autoAck: false, consumer: channelConsumer, cancellationToken);
     }
 

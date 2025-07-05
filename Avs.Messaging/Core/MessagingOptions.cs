@@ -5,34 +5,50 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Avs.Messaging.Core;
 
-public class MessagingOptions
+public class MessagingOptions(IServiceCollection services)
 {
-    private readonly IServiceCollection _services;
+    private readonly Dictionary<Type, List<Type>> _consumerTypes = new(); // key - message type, value - consumer types
     
     public TimeSpan RequestReplyTimeout { get; set; } = TimeSpan.FromSeconds(60);
 
-    public MessagingOptions(IServiceCollection services)
-    {
-        _services = services;
-    }
-    
     /// <summary>
-    /// Adds a message consumer. Consumers are registered as singletons.
+    /// Adds a message consumer. Consumers are registered as scoped services, receiving a new message creates a new scope.
     /// </summary>
     /// <typeparam name="T">Type of consumer</typeparam>
     public void AddConsumer<T>() where T : class, IConsumer
     {
-        _services.AddSingleton<IConsumer, T>();
+        var consumerType = typeof(T);
+        var baseType = consumerType.BaseType;
+        
+        if (consumerType.IsAssignableFrom(typeof(ConsumerBase<>)) || baseType == null)
+        {
+            throw new InvalidOperationException($"The consumer type {consumerType.FullName} is not a inherited from ConsumerBase type.");
+        }
+        
+        var messageType = baseType.GenericTypeArguments.FirstOrDefault()!;
+        if (_consumerTypes.TryGetValue(messageType, out var lst) && !lst.Contains(consumerType))
+        {
+            lst.Add(consumerType);
+        }
+        else
+        {
+            lst = [consumerType];
+            _consumerTypes.Add(messageType, lst);
+        }
+        
+        services.AddScoped<T>();
     }
-
+    
+    public Dictionary<Type, List<Type>> ConsumerTypes => _consumerTypes;
+    
     /// <summary>
     /// Sets <see cref="IMessageTransport"/> as message transport
     /// </summary>
     /// <param name="transport">Actual transport instance, registered as singleton.</param>
     public void SetTransport(IMessageTransport transport)
     {
-        _services.RemoveAll(typeof(IMessageTransport));
-        _services.AddSingleton(transport);
+        services.RemoveAll(typeof(IMessageTransport));
+        services.AddSingleton(transport);
     }
 
     /// <summary>
@@ -40,7 +56,7 @@ public class MessagingOptions
     /// </summary>
     public void AddRpcClient()
     {
-        _services.AddScoped<IRpcClient, RpcClient>();
+        services.AddScoped<IRpcClient, RpcClient>();
     }
 
     /// <summary>
@@ -49,6 +65,6 @@ public class MessagingOptions
     /// <param name="configure">Delegate which configures <see cref="IServiceCollection"/></param>
     public void ConfigureServices(Action<IServiceCollection> configure)
     {
-        configure(_services);
+        configure(services);
     }
 }
