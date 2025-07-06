@@ -19,8 +19,8 @@ public class MessagingOptions(IServiceCollection services)
     {
         var consumerType = typeof(T);
         var baseType = consumerType.BaseType;
-        
-        if (consumerType.IsAssignableFrom(typeof(ConsumerBase<>)) || baseType == null)
+       
+        if (baseType is null || baseType.GetGenericTypeDefinition() != typeof(ConsumerBase<>))
         {
             throw new InvalidOperationException($"The consumer type {consumerType.FullName} is not a inherited from ConsumerBase type.");
         }
