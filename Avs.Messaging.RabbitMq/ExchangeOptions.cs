@@ -38,9 +38,9 @@ public class ExchangeOptions
     public string RoutingKey { get; set; } = string.Empty;
     
     /// <summary>
-    /// Exchange type
+    /// Exchange type (Fanout by default)
     /// </summary>
-    public string ExchangeType { get; set; } = RabbitMQ.Client.ExchangeType.Fanout;
+    public string ExchangeType { get; internal set; } = RabbitMQ.Client.ExchangeType.Fanout;
 
     /// <summary>
     /// Basic properties (headers, correlation ID, etc.
@@ -52,5 +52,23 @@ public class ExchangeOptions
     /// </summary>
     public bool IsRequestReply { get; set; }
     
+    /// <summary>
+    /// For a request-reply flow, this is a type of message which represents request.
+    /// </summary>
     public string? RequestType { get; set; }
+    
+    /// <summary>
+    /// Sets exchange type to Topic
+    /// </summary>
+    public void SetTopicExchange() => ExchangeType = RabbitMQ.Client.ExchangeType.Topic;
+    
+    /// <summary>
+    /// Sets exchange type to Direct
+    /// </summary>
+    public void SetDirectExchange() => ExchangeType = RabbitMQ.Client.ExchangeType.Direct;
+    
+    /// <summary>
+    /// Sets exchange type to Headers
+    /// </summary>
+    public void SetHeadersExchange() => ExchangeType = RabbitMQ.Client.ExchangeType.Headers;
 }

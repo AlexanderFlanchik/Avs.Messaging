@@ -62,13 +62,13 @@ public class RabbitMqOptions
         {
             o.IsRequestReply = true;
             o.RoutingKey = typeof(TRequest).FullName!;
-            o.ExchangeType = ExchangeType.Direct;
+            o.SetDirectExchange();
         });
                 
         ConfigureExchangeOptions<TResponse>(o =>
         {
             o.IsRequestReply = true;
-            o.ExchangeType = ExchangeType.Direct;
+            o.SetDirectExchange();
             o.RoutingKey = typeof(TResponse).FullName!;
             o.RequestType = typeof(TRequest).FullName!;
         });

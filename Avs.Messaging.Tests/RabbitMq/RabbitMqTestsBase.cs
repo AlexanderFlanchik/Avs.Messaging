@@ -20,12 +20,12 @@ public abstract class RabbitMqTestsBase
     [OneTimeSetUp]
     public async Task BeforeAll()
     {
-        await RabbitMqContainer!.StartAsync();
+        await RabbitMqContainer.StartAsync();
     }
     
     [OneTimeTearDown]
     public async Task Clear()
     {
-        await RabbitMqContainer!.DisposeAsync();
+        await RabbitMqContainer.DisposeAsync();
     }
 }

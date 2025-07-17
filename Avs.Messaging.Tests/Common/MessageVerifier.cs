@@ -8,7 +8,11 @@ public class MessageVerifier : IMessageVerifier
     
     public async Task<object?> GetMessageAsync()
     {
-        return await _channel.Reader.ReadAsync();
+        object? result = null;
+        Task[] tasks = [Task.Run(async () => result = await _channel.Reader.ReadAsync()), Task.Delay(200)];
+        await Task.WhenAny(tasks);
+        
+        return result;
     }
 
     public void SetMessage(object message)
