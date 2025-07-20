@@ -12,20 +12,36 @@ builder.Services.AddMessaging(x =>
     x.UseInMemoryTransport();
 });
 
+builder.Services.AddScoped<IMediator, Mediator>();
+
 var app = builder.Build();
 
 app.MapGet("/", () => "Mediator service is running...");
-app.MapPost("/register", async (IRpcClient client, RegisterCommand command, CancellationToken cancellationToken) =>
+app.MapPost("/register", async (IMediator mediator, RegisterCommand command, CancellationToken cancellationToken) =>
 {
-    var response = await client.RequestAsync<RegisterCommand, UserRegistered>(command, cancellationToken);
+    var response = await mediator.SendAsync<RegisterCommand, UserRegistered>(command, cancellationToken);
     return Results.Ok(response);
 });
 
 app.Run();
 
+// Contracts
 record RegisterCommand(string FirstName, string LastName, string Email, string Password);
 record UserRegistered(Guid Id);
 
+// Mediator (App layer)
+interface IMediator
+{
+    Task<TResponse> SendAsync<TRequest, TResponse>(TRequest request, CancellationToken cancellationToken);
+}
+
+class Mediator(IRpcClient client) : IMediator
+{
+    public Task<TResponse> SendAsync<TRequest, TResponse>(TRequest request, CancellationToken cancellationToken)
+        => client.RequestAsync<TRequest, TResponse>(request, cancellationToken);
+}
+
+// Handler implementation
 class RegisterCommandConsumer(ILogger<RegisterCommandConsumer> logger) : ConsumerBase<RegisterCommand>
 {
     protected override async Task Consume(MessageContext<RegisterCommand> messageContext)
@@ -42,6 +58,7 @@ class RegisterCommandConsumer(ILogger<RegisterCommandConsumer> logger) : Consume
     }
 }
 
+// Still needed by RPC flow
 class UserRegisteredConsumer : ConsumerBase<UserRegistered>
 {
     protected override Task Consume(MessageContext<UserRegistered> messageContext)
