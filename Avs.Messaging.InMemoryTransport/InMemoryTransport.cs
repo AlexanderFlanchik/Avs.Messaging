@@ -70,6 +70,8 @@ internal class InMemoryTransport : IMessageTransport
             }
         }
 
+        var filterType = typeof(IMessageHandleFilter<>).MakeGenericType(typeof(T));
+        
         await Parallel.ForEachAsync(consumers, cancellationToken, async (consumerType, _) =>
         {
             using var scope = _serviceProvider.CreateScope();
@@ -77,6 +79,8 @@ internal class InMemoryTransport : IMessageTransport
             {
                 return;
             }
+            
+            context.Filters = scope.ServiceProvider.GetServices(filterType);
             
             await SafeConsumeAsync(consumer, context);
         });

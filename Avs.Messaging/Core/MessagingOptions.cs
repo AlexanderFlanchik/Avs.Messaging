@@ -38,6 +38,16 @@ public class MessagingOptions(IServiceCollection services)
         
         services.AddScoped<T>();
     }
+
+    /// <summary>
+    /// Adds a filter for message consumer
+    /// </summary>
+    /// <typeparam name="TMessage">Type of message</typeparam>
+    /// <typeparam name="TFilter">Type of filter implementation</typeparam>
+    public void AddMessageFilter<TMessage, TFilter>() where TFilter: class, IMessageHandleFilter<TMessage>
+    {
+        services.AddScoped<IMessageHandleFilter<TMessage>, TFilter>();
+    }
     
     public Dictionary<Type, List<Type>> ConsumerTypes => _consumerTypes;
     

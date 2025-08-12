@@ -201,7 +201,10 @@ internal class RabbitMqTransport(
                 return;
             }
             
-            await ReceiveMessageAsync(ea, messageType, consumer, consumerSettings!.IsRequestReply);
+            var filterType = typeof(IMessageHandleFilter<>).MakeGenericType(messageType);
+            var filters = scope.ServiceProvider.GetServices(filterType);
+            
+            await ReceiveMessageAsync(ea, messageType, consumer, filters, consumerSettings!.IsRequestReply);
         };
 
         await _channel!.BasicConsumeAsync(queueName, autoAck: false, consumer: channelConsumer, cancellationToken);
@@ -244,7 +247,7 @@ internal class RabbitMqTransport(
         await _channel!.BasicConsumeAsync(errorExchange, autoAck: false, consumer: channelConsumer, cancellationToken);
     }
 
-    private async Task ReceiveMessageAsync(BasicDeliverEventArgs ea, Type messageType, IConsumer consumer, bool isRequestReply = false)
+    private async Task ReceiveMessageAsync(BasicDeliverEventArgs ea, Type messageType, IConsumer consumer, IEnumerable<object?> filters, bool isRequestReply = false)
     {
         var correlationId = ea.BasicProperties.CorrelationId ?? string.Empty;
         _requestReplyMap.TryGetValue(correlationId, out RequestReplyInfo? requestInfo);
@@ -267,6 +270,7 @@ internal class RabbitMqTransport(
                 Headers = ea.BasicProperties.Headers,
                 CorrelationId = ea.BasicProperties.CorrelationId,
                 MessagePublisher = _publisher!,
+                Filters = filters
             };
                 
             await consumer.Consume(context);

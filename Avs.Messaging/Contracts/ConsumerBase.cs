@@ -22,8 +22,18 @@ public abstract class ConsumerBase<T> : IConsumer
         }
 
         var messageContext = MessageContext<T>.Create(payload, context);
-        
-        await Consume(messageContext);
+        var filters = context.Filters
+                .Where(f => f is not null)
+                .Cast<IMessageHandleFilter<T>>();
+
+        MessageHandlerDelegate<T> handler = async ctx => await Consume(ctx);
+        foreach (var filter in filters)
+        {
+            var next = handler;
+            handler = async ctx => await filter.HandleAsync(ctx, next);
+        }
+
+        await handler(messageContext);
     }
 
     /// <summary>
