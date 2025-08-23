@@ -22,6 +22,8 @@ internal class RabbitMqTransport(
     private IMessagePublisher? _publisher;
     private readonly ConcurrentDictionary<string, RequestReplyInfo> _requestReplyMap = new();
 
+    public string TransportType => RabbitMqOptions.TransportName;
+    
     public Task PublishAsync<T>(T message, PublishOptions? publishOptions = null, CancellationToken cancellationToken = default)
     {
        var consumerSettings = GetExchangeSettings(typeof(T));
@@ -63,6 +65,11 @@ internal class RabbitMqTransport(
             var consumers = group.Value;
             foreach (var consumer in consumers)
             {
+                if (!ShouldSubscribe(consumer))
+                {
+                    continue;
+                }
+                
                 await SubscribeAsync(group.Key, consumer, cancellationToken);
                 consumerCount++;
             }
@@ -116,6 +123,12 @@ internal class RabbitMqTransport(
             await _connection.CloseAsync();
             await _connection.DisposeAsync();
         }
+    }
+
+    private bool ShouldSubscribe(Type consumerType)
+    {
+        return rabbitMqOptions.Consumers.Count == 0 ||
+               rabbitMqOptions.Consumers.Contains(consumerType);
     }
 
     private async Task PublishAsyncInternal(object message, ExchangeOptions exchangeOptions, CancellationToken cancellationToken = default)

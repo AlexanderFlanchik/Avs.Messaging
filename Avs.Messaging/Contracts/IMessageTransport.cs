@@ -5,6 +5,11 @@ namespace Avs.Messaging.Contracts;
 public interface IMessageTransport : IAsyncDisposable
 {
     /// <summary>
+    /// Transport type (In-memory, RabbitMq, ...)
+    /// </summary>
+    string TransportType { get; }
+    
+    /// <summary>
     /// Publishes a message
     /// </summary>
     /// <param name="message">Message to publish</param>

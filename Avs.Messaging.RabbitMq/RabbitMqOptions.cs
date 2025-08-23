@@ -1,10 +1,13 @@
-using RabbitMQ.Client;
+using Avs.Messaging.Core;
+
 // ReSharper disable All
 
 namespace Avs.Messaging.RabbitMq;
 
-public class RabbitMqOptions
+public class RabbitMqOptions : TransportOptionsBase
 {
+    public const string TransportName = "RabbitMq";
+    
     /// <summary>
     /// RabbitMQ broker host
     /// </summary>
@@ -29,6 +32,7 @@ public class RabbitMqOptions
     /// Client service ID. Used as a part of durable queues
     /// </summary>
     public string ServiceId { get; set; } = default!;
+    
     
     /// <summary>
     /// A queue and exchange name for errors during request-reply handling

@@ -16,7 +16,6 @@ public class RequestReplyTests : RabbitMqTestsBase
         using var requestHost = CreateTestHost(x =>
         {
             x.AddConsumer<PongConsumer>();
-            x.AddRpcClient();
         });
 
         using var replierHost = CreateTestHost(x => x.AddConsumer<PingConsumer>());
@@ -26,7 +25,7 @@ public class RequestReplyTests : RabbitMqTestsBase
         try
         {
             using var scope = requestHost.Services.CreateScope();
-            var client = scope.ServiceProvider.GetRequiredService<IRpcClient>();
+            var client = scope.ServiceProvider.GetRequiredKeyedService<IRpcClient>(RabbitMqOptions.TransportName);
             var ping = new Ping(Guid.NewGuid(), DateTime.UtcNow);
 
             // Act
@@ -60,6 +59,7 @@ public class RequestReplyTests : RabbitMqTestsBase
                     cfg.Username = Guest;
                     cfg.Password = Guest;
                     cfg.ConfigureRequestReply<Ping, Pong>();
+                    cfg.AddRpcClient();
                 });
             });
         }).Build();

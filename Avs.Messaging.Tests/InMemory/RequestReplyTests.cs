@@ -17,15 +17,15 @@ public class RequestReplyTests
             {
                 x.AddConsumer<PingConsumer>();
                 x.AddConsumer<PongConsumer>();
-                x.AddRpcClient();
-                x.UseInMemoryTransport();
+                x.UseInMemoryTransport(o => o.AddRpcClient());
             });
         }).Build();
         
         await host.StartAsync();
+        await host.StartAsync();
         
         using var scope = host.Services.CreateScope();
-        var client = scope.ServiceProvider.GetRequiredService<IRpcClient>();
+        var client = scope.ServiceProvider.GetRequiredKeyedService<IRpcClient>(InMemoryTransportOptions.TransportName);
         var ping = new Ping(Guid.NewGuid(), DateTime.UtcNow);
         
         // Act

@@ -22,14 +22,17 @@ public static class MessagingOptionsExtensions
         options.ConfigureServices(services =>
         {
             services.AddSingleton(rabbitMqOptions);
-            ServiceDescriptor? transportDescriptor = services.FirstOrDefault(s =>
-                s.ServiceType == typeof(IMessageTransport));
-            if (transportDescriptor is not null)
+            foreach (var consumerType in rabbitMqOptions.Consumers)
             {
-                services.Remove(transportDescriptor);
+                options.AddConsumer(consumerType);
             }
             
             services.AddSingleton<IMessageTransport, RabbitMqTransport>();
+
+            if (rabbitMqOptions.UseRpcClient)
+            {
+                options.AddRpcClient(RabbitMqOptions.TransportName);
+            }
         });
         
         return options;

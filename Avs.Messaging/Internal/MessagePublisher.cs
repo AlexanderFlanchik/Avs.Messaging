@@ -3,8 +3,11 @@ using Avs.Messaging.Core;
 
 namespace Avs.Messaging.Internal;
 
-internal class MessagePublisher(IMessageTransport transport) : IMessagePublisher
+internal class MessagePublisher(IEnumerable<IMessageTransport> transports) : IMessagePublisher
 {
-    public Task PublishAsync<T>(T message, PublishOptions? publishOptions = null, CancellationToken cancellationToken = default) 
-        => transport.PublishAsync(message, publishOptions, cancellationToken);
+    public Task PublishAsync<T>(T message, PublishOptions? publishOptions = null,
+        CancellationToken cancellationToken = default)
+        => Task.WhenAll(
+                transports.Select(transport => transport.PublishAsync(message, publishOptions, cancellationToken))
+            );
 }

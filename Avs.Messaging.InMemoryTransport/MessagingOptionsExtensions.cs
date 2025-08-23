@@ -6,20 +6,20 @@ namespace Avs.Messaging.InMemoryTransport;
 
 public static class MessagingOptionsExtensions
 {
-    public static MessagingOptions UseInMemoryTransport(this MessagingOptions options)
+    public static MessagingOptions UseInMemoryTransport(this MessagingOptions options, Action<InMemoryTransportOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(options);
+        var transportOptions = new InMemoryTransportOptions();
         options.ConfigureServices(services =>
         {
-            ServiceDescriptor? transportDescriptor = services.FirstOrDefault(s =>
-                s.ServiceType == typeof(IMessageTransport));
-            
-            if (transportDescriptor is not null)
-            {
-                services.Remove(transportDescriptor);
-            }
-
+            configure?.Invoke(transportOptions);
+            services.AddSingleton(transportOptions);
             services.AddSingleton<IMessageTransport, InMemoryTransport>();
+
+            if (transportOptions.UseRpcClient)
+            {
+                options.AddRpcClient(InMemoryTransportOptions.TransportName);
+            }
         });
         
         return options;

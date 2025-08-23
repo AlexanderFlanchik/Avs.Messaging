@@ -8,8 +8,7 @@ builder.Services.AddMessaging(x =>
 {
     x.AddConsumer<RegisterCommandConsumer>();
     x.AddConsumer<UserRegisteredConsumer>();
-    x.AddRpcClient();
-    x.UseInMemoryTransport();
+    x.UseInMemoryTransport(o => o.AddRpcClient());
 });
 
 builder.Services.AddScoped<IMediator, Mediator>();
@@ -35,7 +34,7 @@ interface IMediator
     Task<TResponse> SendAsync<TRequest, TResponse>(TRequest request, CancellationToken cancellationToken);
 }
 
-class Mediator(IRpcClient client) : IMediator
+class Mediator([InMemoryRpcClient]IRpcClient client) : IMediator
 {
     public Task<TResponse> SendAsync<TRequest, TResponse>(TRequest request, CancellationToken cancellationToken)
         => client.RequestAsync<TRequest, TResponse>(request, cancellationToken);

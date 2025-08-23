@@ -8,9 +8,8 @@ namespace Avs.Messaging.Core;
 public class MessagingOptions(IServiceCollection services)
 {
     private readonly Dictionary<Type, List<Type>> _consumerTypes = new(); // key - message type, value - consumer types
-    
     public TimeSpan RequestReplyTimeout { get; set; } = TimeSpan.FromSeconds(60);
-
+    
     /// <summary>
     /// Adds a message consumer. Consumers are registered as scoped services, receiving a new message creates a new scope.
     /// </summary>
@@ -18,6 +17,16 @@ public class MessagingOptions(IServiceCollection services)
     public void AddConsumer<T>() where T : class, IConsumer
     {
         var consumerType = typeof(T);
+        AddConsumer(consumerType);
+    }
+
+    /// <summary>
+    /// Adds a message consumer. Consumers are registered as scoped services, receiving a new message creates a new scope.
+    /// </summary>
+    /// <param name="consumerType">Type of consumer</param>
+    /// <exception cref="InvalidOperationException"></exception>
+    public void AddConsumer(Type consumerType)
+    {
         var baseType = consumerType.BaseType;
        
         if (baseType is null || baseType.GetGenericTypeDefinition() != typeof(ConsumerBase<>))
@@ -36,7 +45,7 @@ public class MessagingOptions(IServiceCollection services)
             _consumerTypes.Add(messageType, lst);
         }
         
-        services.AddScoped<T>();
+        services.AddScoped(consumerType);
     }
 
     /// <summary>
@@ -52,21 +61,36 @@ public class MessagingOptions(IServiceCollection services)
     public Dictionary<Type, List<Type>> ConsumerTypes => _consumerTypes;
     
     /// <summary>
-    /// Sets <see cref="IMessageTransport"/> as message transport
-    /// </summary>
-    /// <param name="transport">Actual transport instance, registered as singleton.</param>
-    public void SetTransport(IMessageTransport transport)
-    {
-        services.RemoveAll(typeof(IMessageTransport));
-        services.AddSingleton(transport);
-    }
-
-    /// <summary>
     /// Adds a scoped client for request-reply messaging to DI container
+    /// This client will use first default available transport from registered
     /// </summary>
+    [Obsolete("Will be removed soon. Use AddRpcClient in transport specific options instead.")]
     public void AddRpcClient()
     {
         services.AddScoped<IRpcClient, RpcClient>();
+    }
+
+    /// <summary>
+    /// Adds transport-specific client for request-reply messaging to DI container
+    /// </summary>
+    /// <param name="clientName">Client name</param>
+    /// <param name="transportType">Name of transport to use</param>
+    /// <exception cref="InvalidOperationException"></exception>
+    public void AddRpcClient(string transportType)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(transportType);
+        ArgumentException.ThrowIfNullOrEmpty(transportType);
+        
+        services.AddKeyedScoped<IRpcClient, RpcClient>(transportType, (sp, _) =>
+        {
+            var transport = sp.GetServices<IMessageTransport>().FirstOrDefault(t => t.TransportType == transportType);
+            if (transport is null)
+            {
+                throw new InvalidOperationException($"The transport type {transportType} is not supported.");
+            }
+            
+            return new RpcClient(transport, this);
+        });
     }
 
     /// <summary>

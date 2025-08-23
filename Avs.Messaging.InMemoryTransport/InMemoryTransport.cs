@@ -13,17 +13,22 @@ internal class InMemoryTransport : IMessageTransport
     private readonly Dictionary<Type, List<Type>> _consumerLookup;
     private readonly ConcurrentDictionary<string, RequestReplyInfo> _requestsMap = new();
     private IMessagePublisher? _publisher;
+    private readonly InMemoryTransportOptions _transportOptions;
 
     public InMemoryTransport(
         IServiceProvider serviceProvider,
         MessagingOptions messagingOptions,
+        InMemoryTransportOptions transportOptions,
         ILogger<InMemoryTransport> logger)
     {
         _serviceProvider = serviceProvider;
         _logger = logger;
         _consumerLookup = messagingOptions.ConsumerTypes;
+        _transportOptions = transportOptions;
     }
 
+    public string TransportType => InMemoryTransportOptions.TransportName;
+    
     public ValueTask DisposeAsync()
     {
         return default;
@@ -32,7 +37,9 @@ internal class InMemoryTransport : IMessageTransport
     public async Task PublishAsync<T>(T message, PublishOptions? publishOptions = null, CancellationToken cancellationToken = default)
     {
         var consumers = _consumerLookup.Where(k => k.Key == typeof(T))
-            .SelectMany(v => v.Value).ToArray();
+            .SelectMany(v => v.Value)
+            .Where(c => _transportOptions.Consumers.Count == 0 || _transportOptions.Consumers.Contains(c))
+            .ToArray();
         
         if (consumers.Length == 0)
         {
