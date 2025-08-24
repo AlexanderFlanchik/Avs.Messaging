@@ -4,21 +4,21 @@ using Microsoft.Extensions.Logging;
 
 namespace Avs.Messaging.Core;
 
-public class MessageListenerHost(IMessageTransport? transport, ILogger<MessageListenerHost> logger) : IHostedService
+public class MessageListenerHost(IEnumerable<IMessageTransport> transports, ILogger<MessageListenerHost> logger) : IHostedService
 {
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(transport, "Unable to start MessageListenerHost: no transport configured");
         logger.LogInformation("Starting message listener host..");
         
-        await transport!.InitAsync(cancellationToken);
+        await Task.WhenAll(transports.Select(t => t.InitAsync(cancellationToken)));
         
         logger.LogInformation("Message listener host started.");
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
-        await transport!.DisposeAsync();
+        await Task.WhenAll(transports.Select(t => t.DisposeAsync().AsTask()));
+        
         logger.LogInformation("Message listener host stopped.");
     }
 }
