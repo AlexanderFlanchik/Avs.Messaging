@@ -11,7 +11,7 @@ export default function() {
     firstName: 'Mr.Test',
     lastName: 'Test',
     email: 'test@test.com',
-    login: 'db24f40e-5de4-405e-9887-c93dd1d860d4',
+    locationId: 'db24f40e-5de4-405e-9887-c93dd1d860d4',
   });
 
   const params = {
