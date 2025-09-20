@@ -25,6 +25,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\Avs.Messaging.InMemoryTransport\Avs.Messaging.InMemoryTransport.csproj" />
+      <ProjectReference Include="..\Avs.Messaging.Mediator\Avs.Messaging.Mediator.csproj" />
       <ProjectReference Include="..\Avs.Messaging.RabbitMq\Avs.Messaging.RabbitMq.csproj" />
       <ProjectReference Include="..\Avs.Messaging\Avs.Messaging.csproj" />
     </ItemGroup>

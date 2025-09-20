@@ -1,21 +1,12 @@
-using Avs.Messaging;
-using Avs.Messaging.Contracts;
-using Avs.Messaging.Core;
-using Avs.Messaging.InMemoryTransport;
+using Avs.Messaging.Mediator;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddMessaging(x =>
-{
-    x.AddConsumer<RegisterCommandConsumer>();
-    x.AddConsumer<UserRegisteredConsumer>();
-    x.UseInMemoryTransport(o => o.AddRpcClient());
-});
 
-builder.Services.AddScoped<IMediator, Mediator>();
-
+builder.Services.AddMediator(cfg => cfg.AddRequestHandler<RegisterCommand, RegisterCommandHandler>());
 var app = builder.Build();
 
 app.MapGet("/", () => "Mediator service is running...");
+
 app.MapPost("/register", async (IMediator mediator, RegisterCommand command, CancellationToken cancellationToken) =>
 {
     var response = await mediator.SendAsync<RegisterCommand, UserRegistered>(command, cancellationToken);
@@ -25,43 +16,14 @@ app.MapPost("/register", async (IMediator mediator, RegisterCommand command, Can
 app.Run();
 
 // Contracts
-record RegisterCommand(string FirstName, string LastName, string Email, string Password);
+record RegisterCommand(string FirstName, string LastName, string Email, string Password) : IRequest<UserRegistered>;
 record UserRegistered(Guid Id);
 
-// Mediator (App layer)
-interface IMediator
+class RegisterCommandHandler(ILogger<RegisterCommandHandler> logger) : IRequestHandler<RegisterCommand, UserRegistered>
 {
-    Task<TResponse> SendAsync<TRequest, TResponse>(TRequest request, CancellationToken cancellationToken);
-}
-
-class Mediator([InMemoryRpcClient]IRpcClient client) : IMediator
-{
-    public Task<TResponse> SendAsync<TRequest, TResponse>(TRequest request, CancellationToken cancellationToken)
-        => client.RequestAsync<TRequest, TResponse>(request, cancellationToken);
-}
-
-// Handler implementation
-class RegisterCommandConsumer(ILogger<RegisterCommandConsumer> logger) : ConsumerBase<RegisterCommand>
-{
-    protected override async Task Consume(MessageContext<RegisterCommand> messageContext)
+    public Task<UserRegistered> HandleAsync(RegisterCommand request, CancellationToken cancellationToken = default)
     {
-        var message = messageContext.Message;
-        logger.LogInformation("Received register command: {firstName}, {lastName}, {email}",
-            message.FirstName,
-            message.LastName,
-            message.Email);
-        
-        var registerId = Guid.NewGuid();
-
-        await RespondAsync(new UserRegistered(registerId), messageContext);
-    }
-}
-
-// Still needed by RPC flow
-class UserRegisteredConsumer : ConsumerBase<UserRegistered>
-{
-    protected override Task Consume(MessageContext<UserRegistered> messageContext)
-    {
-        return Task.CompletedTask;
+        logger.LogInformation($"Registered user: {request.FirstName} {request.LastName}");
+        return Task.FromResult(new UserRegistered(Guid.NewGuid()));
     }
 }

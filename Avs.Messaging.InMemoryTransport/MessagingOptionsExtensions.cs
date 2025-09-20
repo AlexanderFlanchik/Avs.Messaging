@@ -9,9 +9,10 @@ public static class MessagingOptionsExtensions
     public static MessagingOptions UseInMemoryTransport(this MessagingOptions options, Action<InMemoryTransportOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(options);
-        var transportOptions = new InMemoryTransportOptions();
+       
         options.ConfigureServices(services =>
         {
+            var transportOptions = new InMemoryTransportOptions();
             configure?.Invoke(transportOptions);
             services.AddSingleton(transportOptions);
             services.AddSingleton<IMessageTransport, InMemoryTransport>();
