@@ -25,15 +25,21 @@ internal class RabbitMqTransport(
     public string TransportType => RabbitMqOptions.TransportName;
     
     public Task PublishAsync<T>(T message, PublishOptions? publishOptions = null, CancellationToken cancellationToken = default)
+    { 
+        return PublishAsync(message!, typeof(T), publishOptions, cancellationToken);
+    }
+
+    public Task PublishAsync(object message, Type messageType, PublishOptions? publishOptions = null,
+        CancellationToken cancellationToken = default)
     {
-       var consumerSettings = GetExchangeSettings(typeof(T));
-       if (!string.IsNullOrEmpty(publishOptions?.CorrelationId))
-       {
-           consumerSettings.Props = consumerSettings.Props ?? new BasicProperties();
-           consumerSettings.Props.CorrelationId = publishOptions.CorrelationId;
-       }
+        var consumerSettings = GetExchangeSettings(messageType);
+        if (!string.IsNullOrEmpty(publishOptions?.CorrelationId))
+        {
+            consumerSettings.Props = consumerSettings.Props ?? new BasicProperties();
+            consumerSettings.Props.CorrelationId = publishOptions.CorrelationId;
+        }
        
-       return PublishAsyncInternal(message!, consumerSettings, cancellationToken);
+        return PublishAsyncInternal(message!, consumerSettings, cancellationToken);
     }
     
     public async Task InitAsync(CancellationToken cancellationToken = default)

@@ -18,6 +18,17 @@ public interface IMessageTransport : IAsyncDisposable
     /// <typeparam name="T">Type of message</typeparam>
     /// <returns>A task which resolves when a message is published.</returns>
     Task PublishAsync<T>(T message, PublishOptions? publishOptions = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Publishes a message
+    /// </summary>
+    /// <param name="message">Message to publish</param>
+    /// <param name="messageType">Message type</param>
+    /// <param name="publishOptions">Optional publish options</param>
+    /// <param name="cancellationToken">A cancellation token</param>
+    /// <returns>A task which resolves when a message is published.</returns>
+    public Task PublishAsync(object message, Type messageType, PublishOptions? publishOptions = null,
+        CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Transport initialization logic

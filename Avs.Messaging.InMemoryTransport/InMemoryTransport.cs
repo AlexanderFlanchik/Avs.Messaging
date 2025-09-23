@@ -28,28 +28,34 @@ internal class InMemoryTransport : IMessageTransport
     }
 
     public string TransportType => InMemoryTransportOptions.TransportName;
-    
+
     public ValueTask DisposeAsync()
     {
         return default;
     }
 
-    public async Task PublishAsync<T>(T message, PublishOptions? publishOptions = null, CancellationToken cancellationToken = default)
+    public Task PublishAsync<T>(T message, PublishOptions? publishOptions = null,
+        CancellationToken cancellationToken = default)
     {
-        var consumers = _consumerLookup.Where(k => k.Key == typeof(T))
+        return PublishAsync(message!, typeof(T), publishOptions, cancellationToken);
+    }
+
+    public async Task PublishAsync(object message, Type messageType, PublishOptions? publishOptions = null, CancellationToken cancellationToken = default)
+    {
+        var consumers = _consumerLookup.Where(k => k.Key ==messageType)
             .SelectMany(v => v.Value)
             .Where(c => _transportOptions.Consumers.Count == 0 || _transportOptions.Consumers.Contains(c))
             .ToArray();
-        
+
         if (consumers.Length == 0)
         {
-            _logger.LogWarning("No subscribers found for type {MessageType}", typeof(T));
+            _logger.LogWarning("No subscribers found for type {MessageType}", messageType);
             return;
         }
 
         var correlationId = publishOptions?.CorrelationId;
         var isRequestReply = publishOptions?.IsRequestReply ?? false;
-        
+
         if (correlationId is not null && isRequestReply && _requestsMap.TryGetValue(correlationId, out var replyInfo))
         {
             replyInfo.TaskCompletionSource.SetResult(message);
@@ -77,8 +83,8 @@ internal class InMemoryTransport : IMessageTransport
             }
         }
 
-        var filterType = typeof(IMessageHandleFilter<>).MakeGenericType(typeof(T));
-        
+        var filterType = typeof(IMessageHandleFilter<>).MakeGenericType(messageType);
+
         await Parallel.ForEachAsync(consumers, cancellationToken, async (consumerType, _) =>
         {
             using var scope = _serviceProvider.CreateScope();
@@ -86,14 +92,14 @@ internal class InMemoryTransport : IMessageTransport
             {
                 return;
             }
-            
+
             context.Filters = scope.ServiceProvider.GetServices(filterType);
-            
+
             await SafeConsumeAsync(consumer, context);
         });
     }
 
-    public Task InitAsync(CancellationToken cancellationToken = default)
+public Task InitAsync(CancellationToken cancellationToken = default)
     {
         _publisher = _serviceProvider.GetRequiredService<IMessagePublisher>();
         return Task.CompletedTask;
