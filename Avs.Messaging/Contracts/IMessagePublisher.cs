@@ -13,4 +13,15 @@ public interface IMessagePublisher
     /// <typeparam name="T">A message type</typeparam>
     /// <returns>An async operation which resolves when a message is published.</returns>
     Task PublishAsync<T>(T message, PublishOptions? publishOptions = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Publishes a message with specific type
+    /// </summary>
+    /// <param name="message">A message object to publish</param>
+    /// <param name="messageType">Message type</param>
+    /// <param name="publishOptions">A publish options object with correlation ID and headers (optional)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>An async operation which resolves when a message is published.</returns>
+    Task PublishAsync(object message, Type messageType, PublishOptions? publishOptions = null,
+        CancellationToken cancellationToken = default);
 }
