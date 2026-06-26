@@ -16,7 +16,10 @@ public class PubSubTests : RabbitMqTestsBase
        using var consumer1 = CreateConsumerHost(); 
        using var consumer2 = CreateConsumerHost();
         
-       await Task.WhenAll(producer.StartAsync(), consumer1.StartAsync(), consumer2.StartAsync());
+       await Task.WhenAll(
+           producer.StartAsync(), consumer1.StartAsync(), 
+           consumer2.StartAsync()
+           );
        
        var producerPublisher = producer.Services.GetRequiredService<IMessagePublisher>();
        var consumer1Verifier = consumer1.Services.GetRequiredService<IMessageVerifier>();
@@ -54,6 +57,7 @@ public class PubSubTests : RabbitMqTestsBase
                     cfg.Port = RabbitMqContainer.GetMappedPublicPort(5672);
                     cfg.Username = Guest;
                     cfg.Password = Guest;
+                    cfg.ConfigureExchangeOptions<Greeting>(o => o.IsQueueExclusive = true);
                 });
             });
         }).Build();

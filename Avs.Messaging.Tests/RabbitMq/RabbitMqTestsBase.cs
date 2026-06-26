@@ -8,7 +8,7 @@ public abstract class RabbitMqTestsBase
     protected const string Guest = "guest";
     
     protected readonly RabbitMqContainer RabbitMqContainer = new RabbitMqBuilder()
-        .WithImage("rabbitmq:3-management")
+        .WithImage("rabbitmq:4.3-management")
         .WithCleanUp(true)
         .WithName($"test-rabbitmq-{Guid.NewGuid()}")
         .WithPortBinding(5672, true) // Map random port

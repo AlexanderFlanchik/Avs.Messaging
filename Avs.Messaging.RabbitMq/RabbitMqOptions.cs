@@ -65,6 +65,7 @@ public class RabbitMqOptions : TransportOptionsBase
         ConfigureExchangeOptions<TRequest>(o =>
         {
             o.IsRequestReply = true;
+            o.IsQueueExclusive = true;
             o.RoutingKey = typeof(TRequest).FullName!;
             o.SetDirectExchange();
         });
@@ -72,6 +73,7 @@ public class RabbitMqOptions : TransportOptionsBase
         ConfigureExchangeOptions<TResponse>(o =>
         {
             o.IsRequestReply = true;
+            o.IsQueueExclusive = true;
             o.SetDirectExchange();
             o.RoutingKey = typeof(TResponse).FullName!;
             o.RequestType = typeof(TRequest).FullName!;

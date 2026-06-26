@@ -64,6 +64,7 @@ public class FilterTests : RabbitMqTestsBase
                     cfg.Port = RabbitMqContainer.GetMappedPublicPort(5672);
                     cfg.Username = Guest;
                     cfg.Password = Guest;
+                    cfg.ConfigureExchangeOptions<Greeting>(o => o.IsQueueDurable = true);
                 });
             });
         }).Build();

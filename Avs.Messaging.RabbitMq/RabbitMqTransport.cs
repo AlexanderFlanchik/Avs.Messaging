@@ -75,8 +75,17 @@ internal class RabbitMqTransport(
                 {
                     continue;
                 }
-                
-                await SubscribeAsync(group.Key, consumer, cancellationToken);
+
+                try
+                {
+                    await SubscribeAsync(group.Key, consumer, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Error subscribing consumer {consumer}", consumer);
+                    continue;
+                }
+
                 consumerCount++;
             }
         }
@@ -207,6 +216,10 @@ internal class RabbitMqTransport(
         await _channel!.QueueBindAsync(
             queue: queueName,
             exchange: exchangeName,
+            arguments: new Dictionary<string, object?>()
+            {
+                ["x-expires"] = 86400000
+            },
             routingKey: consumerSettings?.RoutingKey ?? string.Empty,
             cancellationToken: cancellationToken
         );
@@ -235,7 +248,7 @@ internal class RabbitMqTransport(
         await _channel!.ExchangeDeclareAsync(errorExchange, ExchangeType.Direct, false, true, 
             cancellationToken: cancellationToken);
         
-        await _channel!.QueueDeclareAsync(errorExchange, false, false, true,
+        await _channel!.QueueDeclareAsync(errorExchange, false, true, true,
             cancellationToken: cancellationToken);
         
         await _channel!.QueueBindAsync(

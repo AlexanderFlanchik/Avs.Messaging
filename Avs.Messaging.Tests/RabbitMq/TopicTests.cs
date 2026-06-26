@@ -104,6 +104,7 @@ public class TopicTests : RabbitMqTestsBase
                     {
                         o.ExchangeName = ExchangeName;
                         o.RoutingKey = routingKey;
+                        o.IsQueueExclusive = true;
                         o.SetTopicExchange();
                     });
                 });
