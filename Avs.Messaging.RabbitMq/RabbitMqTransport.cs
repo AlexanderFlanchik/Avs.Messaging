@@ -20,6 +20,7 @@ internal class RabbitMqTransport(
     private IConnection? _connection;
     private IChannel? _channel;
     private IMessagePublisher? _publisher;
+    private const string RequestReplyHeaderName = "x-request-reply";
     private readonly ConcurrentDictionary<string, RequestReplyInfo> _requestReplyMap = new();
 
     public string TransportType => RabbitMqOptions.TransportName;
@@ -37,6 +38,13 @@ internal class RabbitMqTransport(
         {
             consumerSettings.Props = consumerSettings.Props ?? new BasicProperties();
             consumerSettings.Props.CorrelationId = publishOptions.CorrelationId;
+        }
+
+        if (publishOptions?.IsRequestReply == true)
+        {
+            consumerSettings.Props ??= new BasicProperties();
+            consumerSettings.Props.Headers ??= new Dictionary<string, object?>();
+            consumerSettings.Props.Headers[RequestReplyHeaderName] = true;
         }
        
         return PublishAsyncInternal(message!, consumerSettings, cancellationToken);
@@ -300,6 +308,13 @@ internal class RabbitMqTransport(
                 await _channel!.BasicAckAsync(ea.DeliveryTag, false, ea.CancellationToken);
                 return;
             }
+
+            if (requestInfo is null && isRequestReply && IsRequestReplyMessage(ea.BasicProperties))
+            {
+                logger.LogDebug("Rejecting unmatched request/reply message {MessageType} with no pending correlation {CorrelationId}", messageType.FullName, correlationId);
+                await _channel!.BasicRejectAsync(ea.DeliveryTag, true, ea.CancellationToken);
+                return;
+            }
                 
             var context = new ConsumerContext()
             {
@@ -341,6 +356,26 @@ internal class RabbitMqTransport(
         }
     }
     
+    private static bool IsRequestReplyMessage(IReadOnlyBasicProperties? properties)
+    {
+        if (properties?.Headers is null)
+        {
+            return false;
+        }
+
+        if (!properties.Headers.TryGetValue(RequestReplyHeaderName, out var value))
+        {
+            return false;
+        }
+
+        return value switch
+        {
+            bool boolValue => boolValue,
+            string stringValue when bool.TryParse(stringValue, out var parsedValue) => parsedValue,
+            _ => false
+        };
+    }
+
     private async Task EnsureExchangeDeclaredAsync(string exchangeName, string exchangeType, bool durable, CancellationToken cancellationToken)
     {
         var channel = await EnsureChannelAsync(cancellationToken);

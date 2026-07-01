@@ -82,6 +82,69 @@ public class RequestReplyTests : RabbitMqTestsBase
     }
 
     [Test]
+    public async Task ReplyMessage_WithUnknownCorrelationId_ShouldBeRejectedForRedelivery()
+    {
+        const string queueName = "reply-test-queue";
+        var state = new TrackingConsumerState();
+
+        using var host = TestHostBuilder.CreateTestHostBuilder(services =>
+        {
+            services.AddSingleton(state);
+            services.AddMessaging(x =>
+            {
+                x.AddConsumer<TrackingGreetingConsumer>();
+                x.UseRabbitMq(cfg =>
+                {
+                    cfg.Host = RabbitMqContainer.Hostname;
+                    cfg.Port = RabbitMqContainer.GetMappedPublicPort(5672);
+                    cfg.Username = Guest;
+                    cfg.Password = Guest;
+                    cfg.ServiceId = "reply-test-service";
+                    cfg.ConfigureExchangeOptions<Greeting>(o =>
+                    {
+                        o.QueueName = queueName;
+                        o.IsQueueDurable = true;
+                        o.IsExchangeDurable = true;
+                    });
+                });
+            });
+        }).Build();
+
+        await host.StartAsync();
+
+        try
+        {
+            var publisher = host.Services.GetRequiredService<IMessagePublisher>();
+            await publisher.PublishAsync(new Greeting { Message = "Hello" }, new PublishOptions
+            {
+                CorrelationId = "unknown-correlation",
+                IsRequestReply = true
+            });
+
+            await Task.Delay(1000);
+
+            var factory = new ConnectionFactory
+            {
+                HostName = RabbitMqContainer.Hostname,
+                Port = RabbitMqContainer.GetMappedPublicPort(5672),
+                UserName = Guest,
+                Password = Guest
+            };
+
+            await using var connection = await factory.CreateConnectionAsync();
+            await using var channel = await connection.CreateChannelAsync();
+            var queue = await channel.QueueDeclareAsync($"{queueName}_reply-test-service", durable: true, exclusive: false, autoDelete: false, arguments: null, passive: true);
+
+            Assert.That(queue.MessageCount, Is.GreaterThan(0));
+            Assert.That(state.Count, Is.EqualTo(0));
+        }
+        finally
+        {
+            await host.StopAsync();
+        }
+    }
+
+    [Test]
     public async Task Consumer_ShouldReplyToRequest()
     {
         // Arrange
@@ -135,5 +198,19 @@ public class RequestReplyTests : RabbitMqTestsBase
                 });
             });
         }).Build();
+    }
+
+    private sealed class TrackingConsumerState
+    {
+        public int Count;
+    }
+
+    private sealed class TrackingGreetingConsumer(TrackingConsumerState state) : ConsumerBase<Greeting>
+    {
+        protected override Task Consume(MessageContext<Greeting> messageContext)
+        {
+            Interlocked.Increment(ref state.Count);
+            return Task.CompletedTask;
+        }
     }
 }
