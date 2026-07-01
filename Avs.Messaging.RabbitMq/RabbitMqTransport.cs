@@ -100,7 +100,6 @@ internal class RabbitMqTransport(
         
         await using var ctr = cancellationToken.Register(() => tsc.TrySetCanceled());
         
-        var queueName = $"{typeof(TRequest).FullName!}";
         var props = new BasicProperties()
         {
             CorrelationId = correlationId
@@ -109,16 +108,23 @@ internal class RabbitMqTransport(
         var requestReplyInfo = new RequestReplyInfo(tsc, typeof(TResponse));
         _requestReplyMap.TryAdd(correlationId, requestReplyInfo);
 
-        var requestConsumerSettings = new ExchangeOptions()
-        {
-            QueueName = queueName,
-            ExchangeName = queueName,
-            Props = props,
-            RoutingKey = typeof(TRequest).FullName!,
-            ExchangeType = ExchangeType.Direct
-        };
+        var requestExchangeSettings = GetExchangeSettings(typeof(TRequest));
+        requestExchangeSettings.Props = props;
+        requestExchangeSettings.ExchangeType = ExchangeType.Direct;
+        requestExchangeSettings.IsQueueDurable = true;
+        requestExchangeSettings.IsExchangeDurable = true;
 
-        await PublishAsyncInternal(request!, requestConsumerSettings, cancellationToken);
+        if (string.IsNullOrEmpty(requestExchangeSettings.ExchangeName))
+        {
+            requestExchangeSettings.ExchangeName = typeof(TRequest).FullName!;
+        }
+
+        if (string.IsNullOrEmpty(requestExchangeSettings.RoutingKey))
+        {
+            requestExchangeSettings.RoutingKey = typeof(TRequest).FullName!;
+        }
+
+        await PublishAsyncInternal(request!, requestExchangeSettings, cancellationToken);
 
         var response = (TResponse)(await tsc.Task)!;
         
@@ -130,7 +136,7 @@ internal class RabbitMqTransport(
         if (_channel is not null && _channel.IsOpen)
         {
             await _channel.CloseAsync();
-            await _channel.DisposeAsync();
+            await _channel.DisposeAsync(); 
         }
 
         if (_connection is not null && _connection.IsOpen)
@@ -148,17 +154,16 @@ internal class RabbitMqTransport(
 
     private async Task PublishAsyncInternal(object message, ExchangeOptions exchangeOptions, CancellationToken cancellationToken = default)
     {
-        CheckConnectionAndChannel();
+        await EnsureChannelAsync(cancellationToken);
 
         if (!string.IsNullOrEmpty(exchangeOptions.ExchangeName))
         {
             try
             {
-                await _channel!.ExchangeDeclareAsync(
-                    exchange: exchangeOptions.ExchangeName!,
-                    type: exchangeOptions.ExchangeType!,
+                await EnsureExchangeDeclaredAsync(
+                    exchangeName: exchangeOptions.ExchangeName!,
+                    exchangeType: exchangeOptions.ExchangeType!,
                     durable: exchangeOptions.IsExchangeDurable,
-                    autoDelete: !exchangeOptions.IsExchangeDurable,
                     cancellationToken: cancellationToken);
             }
             catch (Exception e)
@@ -193,6 +198,8 @@ internal class RabbitMqTransport(
     
     private async Task SubscribeAsync(Type messageType, Type consumerType, CancellationToken cancellationToken = default)
     {
+        await EnsureChannelAsync(cancellationToken);
+
         var consumerSettings = GetExchangeSettings(messageType);
         
         var isExchangeDurable = consumerSettings.IsExchangeDurable;
@@ -201,8 +208,7 @@ internal class RabbitMqTransport(
         var exchangeName = consumerSettings.ExchangeName ?? messageType.FullName!;
         var exchangeType = consumerSettings.ExchangeType;
         
-        await _channel!.ExchangeDeclareAsync(exchangeName, exchangeType, isExchangeDurable, !isExchangeDurable, 
-            cancellationToken: cancellationToken);
+        await EnsureExchangeDeclaredAsync(exchangeName, exchangeType, isExchangeDurable, cancellationToken);
 
         var queueName = !consumerSettings.IsRequestReply ? GetQueueName(consumerSettings) : messageType.FullName!;
         if (consumerSettings.IsRequestReply && !string.IsNullOrEmpty(consumerSettings.RequestType))
@@ -210,8 +216,7 @@ internal class RabbitMqTransport(
             await SubscribeToRpcErrorsAsync(consumerSettings.RequestType, cancellationToken);
         }
 
-        await _channel!.QueueDeclareAsync(queueName, isQueueDurable, isExclusive, !isQueueDurable,
-            cancellationToken: cancellationToken);
+        await EnsureQueueDeclaredAsync(queueName, isQueueDurable, isExclusive, cancellationToken);
         
         await _channel!.QueueBindAsync(
             queue: queueName,
@@ -244,12 +249,12 @@ internal class RabbitMqTransport(
 
     private async Task SubscribeToRpcErrorsAsync(string requestType, CancellationToken cancellationToken = default)
     {
+        await EnsureChannelAsync(cancellationToken);
+
         var errorExchange = $"{requestType}.{rabbitMqOptions.RequestReplyErrorQueue}";
-        await _channel!.ExchangeDeclareAsync(errorExchange, ExchangeType.Direct, false, true, 
-            cancellationToken: cancellationToken);
+        await EnsureExchangeDeclaredAsync(errorExchange, ExchangeType.Direct, true, cancellationToken);
         
-        await _channel!.QueueDeclareAsync(errorExchange, false, true, true,
-            cancellationToken: cancellationToken);
+        await EnsureQueueDeclaredAsync(errorExchange, true, false, cancellationToken);
         
         await _channel!.QueueBindAsync(
             queue: errorExchange,
@@ -336,6 +341,95 @@ internal class RabbitMqTransport(
         }
     }
     
+    private async Task EnsureExchangeDeclaredAsync(string exchangeName, string exchangeType, bool durable, CancellationToken cancellationToken)
+    {
+        var channel = await EnsureChannelAsync(cancellationToken);
+
+        try
+        {
+            await channel.ExchangeDeclareAsync(exchangeName, exchangeType, durable, !durable, cancellationToken: cancellationToken);
+        }
+        catch (Exception ex) when (IsTopologyConflict(ex))
+        {
+            logger.LogWarning(ex, "Exchange {ExchangeName} already exists with incompatible topology; continuing with the existing exchange.", exchangeName);
+            _channel = await CreateChannelAsync(cancellationToken);
+        }
+        catch (Exception ex) when (ex is global::RabbitMQ.Client.Exceptions.AlreadyClosedException || ex is global::RabbitMQ.Client.Exceptions.OperationInterruptedException)
+        {
+            _channel = await CreateChannelAsync(cancellationToken);
+            try
+            {
+                await _channel.ExchangeDeclareAsync(exchangeName, exchangeType, durable, !durable, cancellationToken: cancellationToken);
+            }
+            catch (Exception innerEx) when (IsTopologyConflict(innerEx))
+            {
+                logger.LogWarning(innerEx, "Exchange {ExchangeName} already exists with incompatible topology; continuing with the existing exchange.", exchangeName);
+            }
+        }
+    }
+
+    private async Task EnsureQueueDeclaredAsync(string queueName, bool durable, bool exclusive, CancellationToken cancellationToken)
+    {
+        var channel = await EnsureChannelAsync(cancellationToken);
+
+        try
+        {
+            await channel.QueueDeclareAsync(queueName, durable, exclusive, !durable, cancellationToken: cancellationToken);
+        }
+        catch (Exception ex) when (IsTopologyConflict(ex))
+        {
+            logger.LogWarning(ex, "Queue {QueueName} already exists with incompatible topology; continuing with the existing queue.", queueName);
+            _channel = await CreateChannelAsync(cancellationToken);
+        }
+        catch (Exception ex) when (ex is global::RabbitMQ.Client.Exceptions.AlreadyClosedException || ex is global::RabbitMQ.Client.Exceptions.OperationInterruptedException)
+        {
+            _channel = await CreateChannelAsync(cancellationToken);
+            try
+            {
+                await _channel.QueueDeclareAsync(queueName, durable, exclusive, !durable, cancellationToken: cancellationToken);
+            }
+            catch (Exception innerEx) when (IsTopologyConflict(innerEx))
+            {
+                logger.LogWarning(innerEx, "Queue {QueueName} already exists with incompatible topology; continuing with the existing queue.", queueName);
+            }
+        }
+    }
+
+    private async Task<IChannel> EnsureChannelAsync(CancellationToken cancellationToken)
+    {
+        if (_channel is { IsOpen: true })
+        {
+            return _channel;
+        }
+
+        return await CreateChannelAsync(cancellationToken);
+    }
+
+    private async Task<IChannel> CreateChannelAsync(CancellationToken cancellationToken)
+    {
+        if (_connection is null)
+        {
+            throw new InvalidOperationException("RabbitMQ connection has not been initialized");
+        }
+
+        _channel = await _connection.CreateChannelAsync(cancellationToken: cancellationToken);
+        return _channel;
+    }
+
+    private static bool IsTopologyConflict(Exception ex)
+    {
+        return ex is global::RabbitMQ.Client.Exceptions.OperationInterruptedException { ShutdownReason: not null } operationInterrupted
+            && (operationInterrupted.ShutdownReason.ReplyCode == 406
+                || operationInterrupted.ShutdownReason.ReplyText.Contains("PRECONDITION_FAILED", StringComparison.OrdinalIgnoreCase)
+                || operationInterrupted.ShutdownReason.ReplyText.Contains("inequivalent arg", StringComparison.OrdinalIgnoreCase))
+            || ex is global::RabbitMQ.Client.Exceptions.AlreadyClosedException { ShutdownReason: not null } alreadyClosed
+            && (alreadyClosed.ShutdownReason.ReplyCode == 406
+                || alreadyClosed.ShutdownReason.ReplyText.Contains("PRECONDITION_FAILED", StringComparison.OrdinalIgnoreCase)
+                || alreadyClosed.ShutdownReason.ReplyText.Contains("inequivalent arg", StringComparison.OrdinalIgnoreCase))
+            || ex.Message.Contains("PRECONDITION_FAILED", StringComparison.OrdinalIgnoreCase)
+            || ex.Message.Contains("inequivalent arg", StringComparison.OrdinalIgnoreCase);
+    }
+
     private ExchangeOptions GetExchangeSettings(Type messageType)
     {
         rabbitMqOptions.ExchangeSettings.TryGetValue(messageType, out var consumerSettings);
@@ -343,7 +437,9 @@ internal class RabbitMqTransport(
                new ExchangeOptions()
                {
                    ExchangeName = messageType.FullName!,
-                   ExchangeType = ExchangeType.Fanout, 
+                   ExchangeType = ExchangeType.Fanout,
+                   IsQueueDurable = true,
+                   IsExchangeDurable = true,
                    RoutingKey = string.Empty
                };
     }

@@ -4,11 +4,83 @@ using Avs.Messaging.RabbitMq;
 using Avs.Messaging.Tests.Common;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using RabbitMQ.Client;
 
 namespace Avs.Messaging.Tests.RabbitMq;
 
 public class RequestReplyTests : RabbitMqTestsBase
 {
+    [Test]
+    public void ConfigureRequestReply_ShouldUseDurableDirectExchangeSettings()
+    {
+        var options = new RabbitMqOptions();
+
+        options.ConfigureRequestReply<Ping, Pong>();
+
+        var requestSettings = options.ExchangeSettings[typeof(Ping)];
+        var responseSettings = options.ExchangeSettings[typeof(Pong)];
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(requestSettings.IsRequestReply, Is.True);
+            Assert.That(requestSettings.IsQueueDurable, Is.True);
+            Assert.That(requestSettings.IsExchangeDurable, Is.True);
+            Assert.That(requestSettings.ExchangeName, Is.EqualTo(typeof(Ping).FullName));
+            Assert.That(requestSettings.RoutingKey, Is.EqualTo(typeof(Ping).FullName));
+            Assert.That(requestSettings.ExchangeType, Is.EqualTo(ExchangeType.Direct));
+
+            Assert.That(responseSettings.IsRequestReply, Is.True);
+            Assert.That(responseSettings.IsQueueDurable, Is.True);
+            Assert.That(responseSettings.IsExchangeDurable, Is.True);
+            Assert.That(responseSettings.ExchangeName, Is.EqualTo(typeof(Pong).FullName));
+            Assert.That(responseSettings.RoutingKey, Is.EqualTo(typeof(Pong).FullName));
+            Assert.That(responseSettings.ExchangeType, Is.EqualTo(ExchangeType.Direct));
+        });
+    }
+
+    [Test]
+    public async Task Publisher_ShouldHandleExistingNonDurableExchange()
+    {
+        using var host = TestHostBuilder.CreateTestHostBuilder(services =>
+        {
+            services.AddMessaging(x =>
+            {
+                x.UseRabbitMq(cfg =>
+                {
+                    cfg.Host = RabbitMqContainer.Hostname;
+                    cfg.Port = RabbitMqContainer.GetMappedPublicPort(5672);
+                    cfg.Username = Guest;
+                    cfg.Password = Guest;
+                });
+            });
+        }).Build();
+
+        await host.StartAsync();
+
+        try
+        {
+            var factory = new ConnectionFactory
+            {
+                HostName = RabbitMqContainer.Hostname,
+                Port = RabbitMqContainer.GetMappedPublicPort(5672),
+                UserName = Guest,
+                Password = Guest
+            };
+
+            await using var connection = await factory.CreateConnectionAsync();
+            await using var channel = await connection.CreateChannelAsync();
+            await channel.ExchangeDeclareAsync(typeof(Greeting).FullName!, ExchangeType.Fanout, durable: false, autoDelete: false);
+
+            var publisher = host.Services.GetRequiredService<IMessagePublisher>();
+
+            Assert.DoesNotThrowAsync(async () => await publisher.PublishAsync(new Greeting { Message = "Hello" }));
+        }
+        finally
+        {
+            await host.StopAsync();
+        }
+    }
+
     [Test]
     public async Task Consumer_ShouldReplyToRequest()
     {
